@@ -11,7 +11,7 @@ function bsend_transaction(){
 
    $sql = "CREATE TABLE bsend_transaction(
        id int(10) unsigned NOT NULL AUTO_INCREMENT,
-       id_order int(10) NOT NULL,
+       id_order int(10) NOT NULL unique,
        first_name varchar(100) DEFAULT '' NOT NULL,
        email varchar(100) DEFAULT '' NOT NULL,
        phone bigint(30) NOT NULL,
@@ -19,10 +19,8 @@ function bsend_transaction(){
        currency varchar(100) DEFAULT '' NOT NULL,
        b_description text DEFAULT '' NOT NULL,
        cmd varchar(100) DEFAULT '' NOT NULL,
-       payment_ref varchar(100) DEFAULT '' NOT NULL,
-       public_key varchar(150) DEFAULT '' NOT NULL UNIQUE,
-       country varchar(100) DEFAULT '' NOT NULL,
-       source  varchar(100) DEFAULT '' NOT NULL,    
+       payment_ref varchar(100) DEFAULT '' NOT NULL, 
+       country varchar(100) DEFAULT '' NOT NULL,    
        b_status varchar(100) DEFAULT '' NOT NULL,
        country_ccode varchar(100) DEFAULT '' NOT NULL,
        country_cdial varchar(100) DEFAULT '' NOT NULL,

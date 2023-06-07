@@ -20,23 +20,25 @@ endif;
   register_deactivation_hook( __FILE__,  'bsend_payment_deactivate' );
 
   function bsend_payment_activate(){
-    include( plugin_dir_path( __FILE__ ) . 'includes/database.php');
+    // include( plugin_dir_path( __FILE__ ) . 'includes/database.php');
 
   }
   function bsend_payment_deactivate(){
-    include( plugin_dir_path( __FILE__ ) . 'includes/drop_database.php');
+    // include( plugin_dir_path( __FILE__ ) . 'includes/drop_database.php');
 
   }
 
-
-include( plugin_dir_path( __FILE__ ) . 'includes/menu-pages.php');
-include( plugin_dir_path( __FILE__ ) . 'includes/settings-fields.php');
-include( plugin_dir_path( __FILE__ ) . 'includes/enqueue.php');
-
- /* check if woocommerce is active then create or plugin */
+  
+// include( plugin_dir_path( __FILE__ ) . 'includes/bsend_insert_data.php');
+// include( plugin_dir_path( __FILE__ ) . 'includes/menu-pages.php');
+// include( plugin_dir_path( __FILE__ ) . 'includes/settings-fields.php');
+// include( plugin_dir_path( __FILE__ ) . 'includes/enqueue.php');
+include( plugin_dir_path( __FILE__ ) . 'includes/ajax.php');
+  
+ /* check if woocommerce is active then create or plugin :stripos(implode($all_plugins), 'woocommerce.php') && */
  include_once( ABSPATH . 'wp-admin/includes/plugin.php' );
  $all_plugins = apply_filters('active_plugins', get_option('active_plugins'));
-if (stripos(implode($all_plugins), 'woocommerce.php') && is_plugin_active( 'woocommerce/woocommerce.php' )) {
+if (is_plugin_active( 'woocommerce/woocommerce.php' )) {
 
 
 /*
@@ -60,15 +62,15 @@ function bsend_init_gateway_class() {
  		 * Class constructor, more about it in Step 3
  		 */
  		public function __construct() {
-
-            $this->id = 'bsend'; // payment gateway plugin ID
-            $this->icon = plugins_url( 'assets/img/blue.png', __FILE__ ); // URL of the icon that will be displayed on checkout page near your gateway name
-	        $this->has_fields = true; // in case you need a custom credit card form
+ 
+            add_action( "wp_head",array($this,  "bsend_get_total_oredert"), 20 );
+            $this->id = 'bsend'; 
+            $this->icon = plugins_url( 'assets/img/blue.png', __FILE__ );
+	        $this->has_fields = true; 
             $this->method_title = 'Bsend Payment';
             $this->method_description = 'Accepter les paiements par Orange Money, MTN Mobile Money, Visa, Moov Money, T-Money, Free Money, WAVE et Airtel Money.'; // will be displayed on the options page
-        
+
             // gateways can support subscriptions, refunds, saved payment methods,
-            // but in this tutorial we begin with simple payments
             $this->supports = array(
                 'products'
             );
@@ -81,40 +83,37 @@ function bsend_init_gateway_class() {
             $this->title = $this->get_option( 'title' );
             $this->description = $this->get_option( 'description' );
             $this->enabled = $this->get_option( 'enabled' );
-            // $this->testmode = 'yes' === $this->get_option( 'testmode' );
-            // $this->private_key = $this->testmode ? $this->get_option( 'test_private_key' ) : $this->get_option( 'private_key' );
-            // $this->publishable_key = $this->testmode ? $this->get_option( 'test_publishable_key' ) : $this->get_option( 'publishable_key' );
             $this->private_key = $this->get_option( 'private_key' );
-           
-            // This action hook saves the settings
+            
             add_action( 'woocommerce_update_options_payment_gateways_' . $this->id, array( $this, 'process_admin_options' ) );
-        
-            // We need custom JavaScript to obtain a token
-            add_action( 'wp_enqueue_scripts', array( $this, 'payment_scripts' ) );
-            
-            // You can also register a webhook here
-            add_action( 'woocommerce_api_{webhook name}', array( $this, 'webhook' ) );
-
-            // add_filter( 'woocommerce_checkout_fields', array( $this, 'bsend_checkout_remove_fields') );
-            // add_filter( 'woocommerce_billing_fields', array( $this,  'adjust_requirement_of_checkout_address_fields') );
-            
-
-            // add_action( 'woocommerce_after_checkout_billing_form', array( $this,'bsend_checkout_select_field') );
-            
-            // add_action( 'woocommerce_checkout_process', array( $this,'bsend_checkout_check_if_selected') );
-            // add_filter( 'woocommerce_billing_fields', array( $this, 'bsend_checkout_remove_fields') );
-
+            add_action( 'wp_enqueue_scripts', array( $this, 'bsend_payment_js' ) );
+                   
  		}
 
 		/**
  		 * Plugin options, we deal with it in Step 3 too
  		 */
+        public function bsend_get_total_oredert($order){
+            
+            global $woocommerce;
+            $newTotal = $woocommerce->cart->total;
+                
+                ?>
+            <script>
+                jQuery(document).ready(function ($) {
+                    $('#bsend_link').val(<?php echo $newTotal; ?>);
+                });
+               ;
+            </script>
+            <?php
+        }
+
  		public function init_form_fields(){
 
             $this->form_fields = array(
                 'enabled' => array(
                     'title'       => 'Enable/Disable',
-                    'label'       => 'Enable Misha Gateway',
+                    'label'       => 'Enable bsend Gateway',
                     'type'        => 'checkbox',
                     'description' => '',
                     'default'     => 'no'
@@ -131,39 +130,11 @@ function bsend_init_gateway_class() {
                     'type'        => 'textarea',
                     'description' => 'This controls the description which the user sees during checkout.',
                     'default'     => 'Pay with your credit card via our super-cool payment gateway.',
-                ),
-                // 'testmode' => array(
-                //     'title'       => 'Test mode',
-                //     'label'       => 'Enable Test Mode',
-                //     'type'        => 'checkbox',
-                //     'description' => 'Place the payment gateway in test mode using test API keys.',
-                //     'default'     => 'yes',
-                //     'desc_tip'    => true,
-                // ),
-                // 'Bsen_api_key' => array(
-                //     'title'       => 'Api key',
-                //     'type'        => 'password'
-                // )
+                ), 
                 'private_key' => array(
                     'title'       => 'Api key',
                     'type'        => 'password'
-                )
-                // 'test_publishable_key' => array(
-                //     'title'       => 'Test Publishable Key',
-                //     'type'        => 'text'
-                // ),
-                // 'test_private_key' => array(
-                //     'title'       => 'Test Private Key',
-                //     'type'        => 'password',
-                // ),
-                // 'publishable_key' => array(
-                //     'title'       => 'Live Publishable Key',
-                //     'type'        => 'text'
-                // ),
-                // 'private_key' => array(
-                //     'title'       => 'Live Private Key',
-                //     'type'        => 'password'
-                // )
+                ) 
             );
 	
 	 	}
@@ -172,453 +143,290 @@ function bsend_init_gateway_class() {
 		 * You will need it if you want your custom credit card form
 		 */
 		public function payment_fields() {
+		  
+		  function randomAbc123(){
+            $characts    = 'abcdefghijklmnopqrstuvwxyz';
+             $characts   .= 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';	
+            $characts   .= '1234567890'; 
+            $characts   .= '!?#$%^'; 
+            $code_aleatoire      = ''; 
+        
+            for($i=0;$i < 10;$i++)
+            { 
+                $code_aleatoire .= substr($characts,rand()%(strlen($characts)),1); 
+                
+            }
 
-	 	 
+          return $code_aleatoire; 
+        }
+		  
+		     $ref = randomAbc123();
+                
+	 	 ?>  
+           <!-- <div style="display: flex;flex-wrap: wrap; justify-content: center;">
+              <img style="height: 75px ; padding-top: 2px" src="<?php //echo plugins_url( 'assets/img/download6.jpg', __FILE__ )?>">
+              <img style="height: 75px ; padding-top: 2px " src="<?php// echo plugins_url( 'assets/img/download7.jpg', __FILE__ )?>">
+               <img style="height: 75px ; padding-top: 2px " src="<?php// echo plugins_url( 'assets/img/download2.png', __FILE__ )?>">
+              <img style="height: 75px ; padding-top: 2px " src="<?php //echo plugins_url( 'assets/img/download3.jpg', __FILE__ )?>">
+              <img style="height: 75px ; padding-top: 2px " src="<?php//echo plugins_url( 'assets/img/download4.jpg', __FILE__ )?>">
+              <img style="height: 75px ; padding-top: 2px " src="<?php //echo plugins_url( 'assets/img/download1.png', __FILE__ )?>">
+              <img style="height: 75px ; padding-top: 2px " src="<?php //echo plugins_url( 'assets/img/download5.png', __FILE__ )?>"> 
+              <img style="height: 75px ; padding-top: 2px " src="<?php //echo plugins_url( 'assets/img/maxresdefault.jpg', __FILE__ )?>">
+               <img style="height: 75px ; padding-top: 2px " src="<?php //echo plugins_url( 'assets/img/download9.png', __FILE__ )?>">
+                
+          </div> -->
+         
+           <input type="hidden" id="bsend_link" name="bsend_link" value="">
+           <input type="hidden" id="bsend_checkout_test" name="bsend_checkout_test" value="<?php echo $ref; ?>">
+          
+         <?php 
+		
 		}
 
 		/*
 		 * Custom CSS and JS, in most cases required only when you decided to go with a custom credit card form
 		 */
-	 	public function payment_scripts() {
-
-            // we need JavaScript to process a token only on cart/checkout pages, right?
-            if ( ! is_cart() && ! is_checkout() && ! isset( $_GET['pay_for_order'] ) ) {
-                return;
-            }
-
-            // if our payment gateway is disabled, we do not have to enqueue JS too
-            if ( 'no' === $this->enabled ) {
-                return;
-            }
-
-            // no reason to enqueue JavaScript if API keys are not set
-            if ( empty( $this->private_key  ) ) {
-                return;
-            }
-
-            // do not work with card detailes without SSL unless your website is in a test mode
-            if ( ! is_ssl() ) {
-                return;
-            }
-
-            // let's suppose it is our payment processor JavaScript that allows to obtain a token
-            // wp_enqueue_script( 'bsend_js', 'https://www.mishapayments.com/api/token.js' );
-
-            // and this is our custom JS in your plugin directory that works with token.js
-            // wp_register_script( 'woocommerce_bsend', plugins_url( 'bsend.js', __FILE__ ), array( 'jquery', 'bsend_js' ) );
-
-            // in most payment processors you have to use PUBLIC KEY to obtain a token
-            // wp_localize_script( 'woocommerce_bsend', 'misha_params', array(
-            // 	'publishableKey' => $this->publishable_key
-            // ) );
-
-            // wp_enqueue_script( 'woocommerce_bsend' );              
-	
-	 	}
-
-		/*
- 		 * Fields validation, more in Step 5
-		 */
-		public function validate_fields() {
-
-            if( empty( $_POST[ 'billing_first_name' ]) ) {
-                wc_add_notice(  'First name is required!', 'error' );
-                return false;
-            }
-
-            return true;
+		
+		public function bsend_payment_js()
+		{
+  
+			wp_enqueue_script(
+                'woocommerce_bsend',
+                plugins_url( 'assets/js/index.js', __FILE__ ), 
+                ['jquery'],
+                NULL, 
+                true 
+              );
+                $argarray = array(
+                    'ajaxurl' => admin_url( 'admin-ajax.php' ),
+                    'private_key' => $this->private_key
+                );
+               wp_localize_script( 'woocommerce_bsend' , 'bsend_params' , $argarray  );
 
 		}
+
+        // public function randomAbc123(){
+        //     $characts    = 'abcdefghijklmnopqrstuvwxyz';
+        //      $characts   .= 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';	
+        //     $characts   .= '1234567890'; 
+        //     $characts   .= '!?#$%^'; 
+        //     $code_aleatoire      = ''; 
+        
+        //     for($i=0;$i < 10;$i++)
+        //     { 
+        //         $code_aleatoire .= substr($characts,rand()%(strlen($characts)),1); 
+        //         $code_aleatoire .= 'bsend1.0'; 
+        //     }
+
+        //   return $code_aleatoire; 
+        // }
 
 		/*
 		 * We're processing the payments here, everything about it is in Step 5
 		 */
 		public function process_payment( $order_id ) {
 
-            if(!isset($_POST['private_key']))
-				return ;
-			
-		//	$payment_ref = trim(rtrim(sanitize_text_field($_POST['campay_payment_option'])));
-			
-				$server_url = "https://bsend-op.com/api/v1.0/payment/control";
-                        
-			global $woocommerce;
-
-            $api_key = sanitize_text_field($_POST['private_key']); 
-            
+            global $woocommerce;
+  
 			$order = wc_get_order( $order_id );
+           
+            $today = strtotime("now");
+            $payment_timeout = 3;
+            $expiry = strtotime("+".$payment_timeout." minutes", $today);
+            $payement_ref = sanitize_text_field($_POST['bsend_checkout_test']); 
+            $api_key = $this->private_key ;
+            $payment_completed = 0;  
+            $payment = [] ;
 
-			$price = $order->get_total();
-            $order_phone = $order->get_billing_phone();      
-			$order_mail = $order->get_billing_email();
-			$order_name = $order->get_billing_first_name() ." " . $order->get_billing_last_name() ;
-            $order_type = "BS_PAY";
-			$currency = "XAF";
-			$order_currency = $order->get_currency();
-			$order_currency = strtoupper($order_currency);//
-			$description = "Payment from : ".site_url()." for other : ".$order->get_id();
-            $order_language = 'fr';//
-			$payement_ref = $this->guidv4();
-            $order_country = $order->get_billing_country();
-            
-            $order_country_code = "CM";
-            $order_country_cdial = "237";
-            
-			$payment_timeout = 15;
-			$order_created_date = $order->get_date_created();
-			$order_expiry_time = $order_created_date;
-			$order_expiry_time->add(new DateInterval("PT5M"));//
-            var_dump($api_key);
+            if(!empty( $_POST['bsend_checkout_test'])){
 
-            $params = array( 
-                "amount" => $price,
-                "phone" => $order_phone,
-                "email" => $order_mail ,
-                "first_name" => $order_name,
-                "cmd" => $order_type,
-                "currency" => $currency,
-                "description"=> $description,
-                "langue" => $order_language,
-                "payment_ref" => $$payement_ref,
-                "public_key" => $api_key,
-                "country" => $order_country,
-                "country_ccode" => $order_country_code,
-                "country_cdial"=>$order_country_cdial
-            );
-            {
-                
+                while($today <=  $expiry){
+                    sleep(2);
+                     
+                    $payment = $this->bsend_check_payment($payement_ref,$api_key);
+        
+                        if(!empty($payment))
+                        {
+
+                            if($payment['result'] == "success"){
+
+                                if($payment['statut'] == "success") {
+
+                                    $order->update_status('completed', __('Payment received', 'bsend'));
+                                    $order->add_order_note( 'Transaction complete with ref : '.$payement_ref, true );
+                                    $order->payment_complete();
+                                    $order->reduce_order_stock();
+                                    WC()->cart->empty_cart();	
+                                    $payment_completed = 1;
+                                    $today = strtotime("now")+180;
+                                    break;
+
+                                }else if($payment['statut'] == "pending") {
+	
+                                    $payment_completed = 2;
+                                //     // $order->update_status('processing', __('Payment processing', 'bsend'));
+                                    $today = strtotime("now")+2;
+
+                                }else{
+
+                                    $order->update_status('failed', __('Payment was cancelled', 'bsend'));
+                                    $payment_completed = 3; 
+                                     $today = strtotime("now")+180;
+                                    break;
+
+                                }
+
+                           }else{
+                              $payment_completed = 4; 
+                              $today = strtotime("now")+180;
+                            }             
+                       }else{
+                        $today = strtotime("now")+180;
+                        break;
+                       }
+                      
+                }
+
+                if( $payment_completed == 1)
+                {
+                        $order->add_order_note( 'Transaction was sucessful : '.$payement_ref, true ); 
+                        return array(
+                                'result' => 'success',
+                                'redirect' => $this->get_return_url($order)
+                        );
+                }	
+                elseif($payment_completed == 2)
+                {
+                    $order->update_status('failed', __('Payment was cancelled', 'bsend'));  
+                    wc_add_notice(  __('Payment failed! the waiting period has ended, you should try again', 'bsend'), 'error' );
+                    $order->add_order_note( 'Transaction failed with ref : '.$payement_ref, true );                
+              
+                }elseif( $payment_completed == 3 )
+                {
+                     
+                    wc_add_notice(  __('Payment failed! Payment was declined by payer or insuficient funds', 'bsend'), 'error' );
+                    $order->add_order_note( 'Transaction failed with ref : '.$payement_ref, true );                
+              
+               }else{
+                    $order->update_status('failed', __('Payment was cancelled', 'bsend'));                                
+                    wc_add_notice(  __('Failed to initiate transaction please try again later'), 'error' );	
+               
+                }
+
+            }else{
+                wc_add_notice(  __('Failed to initiate transaction please try again later'), 'error' );	
+                          
             }
-			$params = json_encode($params);
+            
+
+        }
+ 
+        
+        public function bsend_check_payment($ref,$public_key)
+		{
+            
+			$server_url = "https://bsend-op.com/api/v1.0/api-checkout";
 			
-			$headers = array('Content-Type: application/json');
+            $headers = array('Content-Type: application/json');
+        
+            $data = array( 
+                "payment_ref" => $ref,
+                "public_key" => $public_key,
+            );
 			
 			$response = wp_remote_post($server_url, array(
 				"method"=>"POST",
 				"sslverify"=>true,
 				"headers"=>$headers,
-				"body"=>$params
-			));
-            // print_r($response) ;
-			if(!is_wp_error($response))
-			{
-				// $response_body = wp_remote_retrieve_body($response);
-				$resp_array = json_decode($response);
+				"body"=>$data,
+                'timeout'   => 45,
+                'data_format' => 'body',
+			));	
 
-                if($resp_array->response == "Success")
-					// return $resp_array->payment_url;
-                    return array(
+            if(!is_wp_error($response)) {
+				$response_body = wp_remote_retrieve_body($response);
+				$resp_array = json_decode($response_body); 
+                
+
+                if($resp_array->response == "Success") {
+                    // wc_add_notice( '' . $resp_array->response, 'error' );
+                   return array(
                         "result"=>"success",
-                        "redirect"=>$resp_array->payment_url
+                        "statut"=>$resp_array->statut
+                    );  
+                }
+				else if($resp_array->response == "error"){
+				    //  wc_add_notice( '' . $resp_array->message, 'error' );
+                    return array(
+                        "result"=>"error",
+                        "statut"=>$payment_ref
+                        
+                    );  
+                }else{
+				//	 wc_add_notice(  'Unable to get access', 'error' );
+                    return array(
+                        "result"=>"error",
+                        "statut"=>'Unable to get access'
                     );
-					// wc_add_notice(  'dWGTG QTQTQ5R', 'error' );
-				elseif($resp_array->response == "error")
-				    wc_add_notice( 'NNNN'. $resp_array->message, 'error' );
-				else
-					wc_add_notice(  'Unable to get access token', 'error' );
-
-				// if(isset($resp_array->token) && !isset($resp_array->non_field_errors))
-				// 	return $resp_array->token;
-				// elseif(!isset($resp_array->token) && isset($resp_array->non_field_errors))
-				//     wc_add_notice(  $resp_array->non_field_errors[0], 'error' );
-				// else
-				// 	wc_add_notice(  'Unable to get access token', 'error' );
+                }
 			}
-			else
-				wc_add_notice(  'Failed to initiate transaction please try again later', 'error' );
-
-	 
-					
-	 	}
-
-		/*
-		 * In case you need a webhook, like PayPal IPN etc
-		 */
-		public function webhook() {
- 
-					
-	 	}
-
-
-        public function bsend_checkout_remove_fields( $checkout_fields ) {
-
-            // and to remove the billing fields below
-            unset( $checkout_fields[ 'billing' ][ 'billing_company' ] );
-            unset( $checkout_fields[ 'billing' ][ 'billing_address_1' ] );
-            unset( $checkout_fields[ 'billing' ][ 'billing_address_2' ] );
-            unset( $checkout_fields[ 'billing' ][ 'billing_city' ] );
-            unset( $checkout_fields[ 'billing' ][ 'billing_state' ] ); // remove state field
-            unset( $checkout_fields[ 'billing' ][ 'billing_postcode' ] ); // remove zip code field
-
-	
-            //  $checkout_fields[ 'billing' ][ 'billing_first_name' ]['required'] = true;
-            //  $checkout_fields[ 'billing' ][ 'billing_last_name' ]['required'] = true;
-            //  $checkout_fields[ 'billing' ][ 'billing_phone' ]['required'] = true;
-            //  $checkout_fields[ 'billing' ][ 'billing_email' ]['required'] = true;
-            //  $checkout_fields[ 'order' ][ 'order_comments' ]['required'] = true; // remove order notes // remove company field
-            //  $checkout_fields[ 'billing' ][ 'billing_country' ]['required'] = true;
-   
-            
-            // $checkout_fields[ 'billing' ][ 'billing_city' ]['required'] = false;
-            // $checkout_fields[ 'billing' ][ 'billing_state' ]['required'] = false; // remove state field
-            // $checkout_fields[ 'billing' ][ 'billing_postcode' ]['required'] = false; // remove zip code field
-            // $checkout_fields[ 'billing' ][ 'billing_address_1' ]['required'] = false;
-            //  $checkout_fields[ 'billing' ][ 'billing_address_2' ]['required'] = false;
-        
-             
-        
-            return $checkout_fields;
-        }
-
-        public function adjust_requirement_of_checkout_address_fields( $fields ) { 
-
-                $fields['billing_address_1']['required'] = false;
-                $fields['billing_address_2']['required'] = false;
-                $fields['billing_postcode']['required'] = false;
-                $fields['billing_city']['required'] = false;
-                $fields['billing_phone']['required'] = false;
-                return $fields;
-            
-        }
-            
-
-        public function bsend_checkout_select_field($checkout){
-
-            woocommerce_form_field( 
-                'bsend_country_cdial', 
-                array(
-                    'type'          => 'select',
-                    'required'	    => true,
-                    'input_class'   => array('select2-selection' , 'select2-selection--single'),
-                    'class'         => array( 'misha-field', 'form-row-wide' ), // array only, read more about classes and styling in the previous step
-                    'label'         => 'Numeros dial',
-                    'label_class'   => 'misha-label', 
-                    'options'    	=> array(
-                                      ''		=> 'Please select',
-                                    'By phone'	=> 'By phone',
-                                    'By email'	=> 'By email'
-                                    )
-                    ), 
-                    $checkout->get_value( 'bsend_country_cdial' ) 
-            );
-
-        }
-
-        // <span class="select2-selection select2-selection--single" aria-haspopup="true" aria-expanded="false" tabindex="0" aria-label="Pays/région" role="combobox"><span class="select2-selection__rendered" id="select2-billing_country-container" role="textbox" aria-readonly="true" title="Cameroun">Cameroun</span><span class="select2-selection__arrow" role="presentation"><b role="presentation"></b></span></span>
-
-        public function bsend_checkout_check_if_selected() {
-
-            // you can add any custom validations here
-            if ( empty( $_POST[ 'bsend_country_cdial' ] ) ) {
-                wc_add_notice( 'Please select your preferred contact method.', 'error' );
-            }
-            
-        }
-         
-
-        /*
-		 * Get token from campay
-		 */
-		
-		public function get_token($server_uri)
-		{
-			
-			// $user = $this->campay_username;
-			// $pass = $this->campay_password;
-			
-			// $params = array("username"=>$user, "password"=>$pass);
-			// //$params = json_encode($params);
-			
-			// $headers = array('Content-Type: application/json');
-			
-			// $response = wp_remote_post($server_uri."/api/token/", array(
-			// 	"method"=>"POST",
-			// 	"sslverify"=>true,
-			// 	"headers"=>$headers,
-			// 	"body"=>$params
-			// ));
-			// if(!is_wp_error($response))
-			// {
-			// 	$response_body = wp_remote_retrieve_body($response);
-			// 	$resp_array = json_decode($response_body);
-
-			// 	if(isset($resp_array->token) && !isset($resp_array->non_field_errors))
-			// 		return $resp_array->token;
-			// 	elseif(!isset($resp_array->token) && isset($resp_array->non_field_errors))
-			// 	    wc_add_notice(  $resp_array->non_field_errors[0], 'error' );
-			// 	else
-			// 		wc_add_notice(  'Unable to get access token', 'error' );
-			// }
-			// else
-			// 	wc_add_notice(  'Failed to initiate transaction please try again later', 'error' );
-			
-			
-			
-		}
-
-        public function execute_payment($token, $params, $server_uri)
-		{
-			
-			// $headers = array(
-			// 	'Authorization' => 'Token '.$token,
-			// 	'Content-Type' => 'application/json'
-			// 	);
-				
-			// $response = wp_remote_post($server_uri."/api/collect/", array(
-			// 	"method"=>"POST",
-			// 	"sslverify"=>true,
-			// 	"body"=>$params,				
-			// 	"headers"=>$headers,
-			// 	"data_format"=>"body"
-			// ));			
-			
-			// if(!is_wp_error($response))
-			// {
-			// 	$response_body = wp_remote_retrieve_body($response);
-			// 	$resp_array = json_decode($response_body);
-			// 	if(isset($resp_array->reference))
-			// 		return $resp_array->reference;
-			// 	if(!isset($resp_array->reference) && isset($resp_array->message))
-			// 		wc_add_notice(  $resp_array->message, 'error' );
-			// }
-			// else
-			// 	wc_add_notice(  __('Failed to initiate transaction please try again later', 'campay-api'), 'error' );
-			
-		}
-
-        public function check_payment($token, $trans, $server_uri)
-		{
-			
-			// $headers = array(
-			// 	'Authorization' => 'Token '.$token,
-			// 	'Content-Type' => 'application/json'
-			// );
-			
-			// $response = wp_remote_get($server_uri."/api/transaction/".$trans."/", array(
-			// 	"sslverify"=>true,				
-			// 	"headers"=>$headers,
-			// ));
-			
-			// if(!is_wp_error($response))
-			// {
-			// 	$response_body = wp_remote_retrieve_body($response);
-			// 	$resp_array = json_decode($response_body);
-				
-			// 	if(isset($resp_array->status))
-			// 		return $resp_array;
-			// 	else
-			// 		wc_add_notice(  __('Invalid Transaction Reference', 'campay-api'), 'error' );
-			// }
-			// else
-			// 	wc_add_notice(  __('Failed to initiate transaction please try again later', 'campay-api'), 'error' );			
-			
-		
-		}
-
-        public function get_payment_link($token, $parameters, $server_uri)
-        {
-                
-                
-                // $headers = array(
-                //                 'Authorization' => 'Token '.$token,
-                //                 'Content-Type' => 'application/json'
-                // );
-                            
-                // $response = wp_remote_post($server_uri."/api/get_payment_link/", array(
-                //     "method"=>"POST",
-                //     "sslverify"=>true,
-                //     "body"=>$parameters,				
-                //     "headers"=>$headers,
-                //     "data_format"=>"body"
-                // ));
-                            
-                // if(!is_wp_error($response))
-                // {
-                //     $response_body = wp_remote_retrieve_body($response);
-                //     $resp_array = json_decode($response_body);
+			else{
+                $err = $response->get_error_message();;
+				// wc_add_notice(  __('Error : '.$err.''), 'error' );
+                return array(
+                    "result"=>"error",
+                    "statut"=>$err
                     
-                //     if(isset($resp_array->link))
-                //         return $resp_array->link;
-                //     else
-                //         wc_add_notice(  __('Invalid Transaction Reference', 'campay-api'), 'error' );
-                                     
-                                     
-                // }
-                // else
-                //     wc_add_notice(  __('Failed to initiate transaction please try again later', 'campay-api'), 'error' );			
+                );
+            } 
+	 	}
+
+
+        public function execute_payment( $params, $server_url)
+		{
+			
+			$headers = array('Content-Type: application/json');
+        
+			
+			$response = wp_remote_post($server_url, array(
+				"method"=>"POST",
+				"sslverify"=>true,
+				"headers"=>$headers,
+				"body"=>$params,
+                'timeout'   => 45,
+                'data_format' => 'body',
+			));		
+			
+			if(!is_wp_error($response)) {
+				$response_body = wp_remote_retrieve_body($response);
+				$resp_array = json_decode($response_body); 
                 
-        }
 
-        public function campay_payment_processing_modal()
-		{
-				// if(is_checkout())
-				// {
-				// 	?>
-					
-				<!-- // 	<div id="campay_modal_processing" class="modal">
+                if($resp_array->response == "Success") {
+                    
+                 
 
-				// 	  <!-- Modal content -->
-				 	  <!-- <div class="modal-content">
-				 		<h3 style="text-align:center; text-decoration: underline"><?php echo __('PAYMENT PROCESSING', 'campay-api'); ?></h3>
-				 			<p class="cp_payment_info">
-				 				<?php //echo __('We are waiting for your payment. Please dial *126# for MTN and #150*50# for Orange.', 'campay-api'); ?>
-				 			</p>
-				 			<div class="cp_payment_waiting">
-				 				<img src="<?php echo plugins_url( 'assets/img/wait.gif', __FILE__ ); ?>" />
-				 			</div>
-				 	  </div>
-
-				 	</div> -->
-					
-				 	<?php 
-				// }
+                    // wc_add_notice(  ''. $resp_array->response.'', 'error' );
+                    return array(
+                        "result"=>$resp_array->response,
+                        "redirect"=>$resp_array->payment_url
+                        
+                    ); 
+                }
+				else if($resp_array->response == "error"){
+				    wc_add_notice( 'Error:' . $resp_array->message, 'error' );
+                }else{
+					wc_add_notice(  'Unable to get access', 'error' );
+                }
+			}
+			else{
+                $err = $response->get_error_message();;
+				wc_add_notice(  __('Error : '.$err.''), 'error' );
+            }
 		}
+        
 
-        public function campay_checkout_form_submit()
-		{
-				// if(is_checkout())
-				// {
-				// 	?>
-				// 	<script>
-				// 	    var form = document.getElementsByName("checkout");
-						
-				// 		if(form)
-				// 		{
-							
-				// 			function checkCampay()
-				// 			{
-				// 				var payment_method = document.getElementsByName("payment_method");
-				// 				function isChecked(item)
-				// 				{
-				// 					if(item.checked)
-				// 					{
-				// 						if(item.value=="campay")
-				// 							document.getElementById("campay_modal_processing").style.display="block";
-										
-				// 					}
-				// 				}
-								
-				// 				payment_method.forEach(isChecked);
-							
-				// 			}
-
-				// 			form[0].addEventListener("submit", checkCampay);
-				// 		}
-				// 		function pay_card()
-				// 		{
-							
-				// 				event.preventDefault();
-				// 				document.getElementById("campay_payment_option").value="card";
-				// 				document.getElementById("place_order").click();
-								
-							
-				// 		}
-				// 	</script>
-				// 	<?php
-				// }
-		}
- 	}
-}
-}
-else{
+}}
+}else{
 	return false;
 }
